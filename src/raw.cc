@@ -740,6 +740,9 @@ NAN_METHOD(SocketWrap::Send) {
 		addr.sll_family = AF_PACKET;
 		addr.sll_protocol = htons(ETH_P_ALL);
 		addr.sll_ifindex = ifindex;
+		addr.sll_hatype = htons(ARPHRD_ETHER);
+		addr.sll_pkttype = PACKET_OUTGOING;
+		addr.sll_halen = 8;
 
 		rc = sendto (socket->poll_fd_, data, length, 0,
 				(struct sockaddr *) &addr, sizeof (addr));
