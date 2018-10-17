@@ -5,7 +5,11 @@
 #include <string.h>
 #include "raw.h"
 
+
+#include <sys/ioctl.h>
+#include <linux/if.h>
 #include <linux/if_packet.h>
+#include <linux/if_arp.h>
 #include <net/ethernet.h> /* the L2 protocols */
 
 #ifdef _WIN32
@@ -618,6 +622,32 @@ NAN_METHOD(SocketWrap::Recv) {
 	info.GetReturnValue().Set(info.This());
 }
 
+static int find_and_set_index(int socket, const char * name, unsigned char* dest)
+{
+    struct ifreq ifreq;
+	int index;
+
+    memset(&ifreq, 0, sizeof ifreq);
+
+    snprintf(ifreq.ifr_name, sizeof ifreq.ifr_name, "%s", name);
+
+    if (ioctl(socket, SIOCGIFINDEX, &ifreq)) {
+        return -1;
+    }
+	index = ifreq.ifr_ifindex;
+
+    if (ioctl(socket, SIOCGIFHWADDR, &ifreq)) {
+        return -2;
+    }
+	if (ifreq.ifr_hwaddr.sa_family!=ARPHRD_ETHER) {
+		return -3; /* Not ethernet */
+	}
+
+	memcpy(dest, ifreq.ifr_hwaddr.sa_data, 8);
+
+    return index;
+}
+
 NAN_METHOD(SocketWrap::Send) {
 	Nan::HandleScope scope;
 	
@@ -695,9 +725,21 @@ NAN_METHOD(SocketWrap::Send) {
 				(struct sockaddr *) &addr, sizeof (addr));
 	} else {
 		struct sockaddr_ll addr;
+		Nan::Utf8String address (info[3]);
+		int ifindex = find_and_set_index(socket->poll_fd_, *address, addr.sll_addr);
+		if (ifindex < 0){
+			if(ifindex == -1){
+				Nan::ThrowError("Unknown interface ID.");
+			} else if(ifindex == -2){
+				Nan::ThrowError("Unknown interface MAC.");
+			} else if(ifindex == -2){
+				Nan::ThrowError("Interface not Ethernet.");
+			}
+			return;
+		}
 		addr.sll_family = AF_PACKET;
 		addr.sll_protocol = htons(ETH_P_ALL);
-		addr.sll_ifindex = Nan::To<Uint32>(info[3]).ToLocalChecked()->Value();
+		addr.sll_ifindex = ifindex;
 
 		rc = sendto (socket->poll_fd_, data, length, 0,
 				(struct sockaddr *) &addr, sizeof (addr));

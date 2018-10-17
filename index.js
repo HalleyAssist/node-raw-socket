@@ -53,6 +53,7 @@ function Socket (options) {
 					? AddressFamily.IPv4
 					: options.addressFamily)
 		);
+	this.options = options
 
 	var me = this;
 	this.wrap.on ("sendReady", this.onSendReady.bind (me));
@@ -151,7 +152,7 @@ Socket.prototype.send = function (buffer, offset, length, address,
 		return this;
 	}
 
-	if (! net.isIP (address)) {
+	if (this.options.addressFamily != 0 && ! net.isIP (address)) {
 		afterCallback.call (this, new Error ("Invalid IP address '" + address + "'"));
 		return this;
 	}
