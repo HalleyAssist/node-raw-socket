@@ -5,6 +5,9 @@
 #include <string.h>
 #include "raw.h"
 
+#include <linux/if_packet.h>
+#include <net/ethernet.h> /* the L2 protocols */
+
 #ifdef _WIN32
 static char errbuf[1024];
 #endif
