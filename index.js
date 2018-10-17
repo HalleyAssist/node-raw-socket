@@ -13,6 +13,7 @@ function _expandConstantObject (object) {
 }
 
 var AddressFamily = {
+	0: "Raw",
 	1: "IPv4",
 	2: "IPv6"
 };
@@ -48,9 +49,9 @@ function Socket (options) {
 			((options && options.protocol)
 					? options.protocol
 					: 0),
-			((options && options.addressFamily)
-					? options.addressFamily
-					: AddressFamily.IPv4)
+			((options && options.addressFamily === undefined)
+					? AddressFamily.IPv4
+					: options.addressFamily)
 		);
 
 	var me = this;

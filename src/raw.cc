@@ -466,7 +466,9 @@ NAN_METHOD(SocketWrap::New) {
 			Nan::ThrowTypeError("Address family argument must be an unsigned integer");
 			return;
 		} else {
-			if (Nan::To<Uint32>(info[1]).ToLocalChecked()->Value() == 2)
+			if (Nan::To<Uint32>(info[1]).ToLocalChecked()->Value() == 0)
+				family = PF_PACKET;
+			else if (Nan::To<Uint32>(info[1]).ToLocalChecked()->Value() == 2)
 				family = AF_INET6;
 		}
 	}
@@ -533,17 +535,22 @@ NAN_METHOD(SocketWrap::Recv) {
 	Local<Object> buffer;
 	sockaddr_in sin_address;
 	sockaddr_in6 sin6_address;
+	sockaddr_ll sinll_addr;
 	char addr[50];
 	int rc;
 #ifdef _WIN32
-	int sin_length = socket->family_ == AF_INET6
-			? sizeof (sin6_address)
-			: sizeof (sin_address);
+	int sin_length = 0;
 #else
-	socklen_t sin_length = socket->family_ == AF_INET6
-			? sizeof (sin6_address)
-			: sizeof (sin_address);
+	socklen_t sin_length = 0;
 #endif
+
+	if (socket->family_ == AF_INET6) {
+		sin_length = sizeof (sin6_address);
+	} else if (socket->family_ == AF_INET) {
+		sin_length = sizeof (sin_address);
+	} else {
+		sin_length = sizeof(sockaddr_ll);
+	}
 	
 	if (info.Length () < 2) {
 		Nan::ThrowError("Five arguments are required");
@@ -573,10 +580,15 @@ NAN_METHOD(SocketWrap::Recv) {
 		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
 				(int) node::Buffer::Length (buffer), 0, (sockaddr *) &sin6_address,
 				&sin_length);
-	} else {
+	} else if(socket->family_ == AF_INET) {
 		memset (&sin_address, 0, sizeof (sin_address));
 		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
 				(int) node::Buffer::Length (buffer), 0, (sockaddr *) &sin_address,
+				&sin_length);
+	} else {
+		memset (&sinll_addr, 0, sizeof (sinll_addr));
+		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
+				(int) node::Buffer::Length (buffer), 0, (sockaddr *) &sinll_addr,
 				&sin_length);
 	}
 	
@@ -587,9 +599,11 @@ NAN_METHOD(SocketWrap::Recv) {
 	
 	if (socket->family_ == AF_INET6)
 		uv_ip6_name (&sin6_address, addr, 50);
-	else
+	else if(socket->family_ == AF_INET)
 		uv_ip4_name (&sin_address, addr, 50);
-	
+	else
+		addr[0] = 0; /* TODO */
+
 	Local<Function> cb = Local<Function>::Cast (info[1]);
 	const unsigned argc = 3;
 	Local<Value> argv[argc];
