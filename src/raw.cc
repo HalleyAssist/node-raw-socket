@@ -682,7 +682,7 @@ NAN_METHOD(SocketWrap::Send) {
 		
 		rc = sendto (socket->poll_fd_, data, length, 0,
 				(struct sockaddr *) &addr, sizeof (addr));
-	} else {
+	} else if (socket->family_ == AF_INET) {
 #if UV_VERSION_MAJOR > 0
 		struct sockaddr_in addr;
 		uv_ip4_addr(*Nan::Utf8String(info[3]), 0, &addr);
@@ -690,6 +690,14 @@ NAN_METHOD(SocketWrap::Send) {
 		String::Utf8String address (info[3]);
 		struct sockaddr_in addr = uv_ip4_addr (*address, 0);
 #endif
+
+		rc = sendto (socket->poll_fd_, data, length, 0,
+				(struct sockaddr *) &addr, sizeof (addr));
+	} else {
+		struct sockaddr_ll addr;
+		addr.sll_family = AF_PACKET;
+		addr.sll_protocol = htons(ETH_P_ALL);
+		addr.sll_ifindex = Nan::To<Uint32>(info[3]).ToLocalChecked()->Value();
 
 		rc = sendto (socket->poll_fd_, data, length, 0,
 				(struct sockaddr *) &addr, sizeof (addr));
