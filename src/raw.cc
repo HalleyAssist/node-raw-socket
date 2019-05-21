@@ -52,7 +52,7 @@ namespace raw {
 
 static Nan::Persistent<FunctionTemplate> SocketWrap_constructor;
 
-void InitAll (Handle<Object> exports) {
+void InitAll (Local<Object> exports) {
 	ExportConstants (exports);
 	ExportFunctions (exports);
 
@@ -63,6 +63,8 @@ NODE_MODULE(raw, InitAll)
 
 NAN_METHOD(CreateChecksum) {
 	Nan::HandleScope scope;
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 	
 	if (info.Length () < 2) {
 		Nan::ThrowError("At least one argument is required");
@@ -86,7 +88,7 @@ NAN_METHOD(CreateChecksum) {
 		return;
 	}
 	
-	Local<Object> buffer = info[1]->ToObject ();
+	Local<Object> buffer = info[1]->ToObject (context).ToLocalChecked();
 	char *data = node::Buffer::Data (buffer);
 	size_t length = node::Buffer::Length (buffer);
 	unsigned int offset = 0;
@@ -212,7 +214,7 @@ NAN_METHOD(Ntohs) {
 	info.GetReturnValue().Set(converted);
 }
 
-void ExportConstants (Handle<Object> target) {
+void ExportConstants (Local<Object> target) {
 	Local<Object> socket_level = Nan::New<Object>();
 	Local<Object> socket_option = Nan::New<Object>();
 
@@ -246,16 +248,19 @@ void ExportConstants (Handle<Object> target) {
 	Nan::Set(socket_option, Nan::New("IPV6_V6ONLY").ToLocalChecked(), Nan::New<Number>(IPV6_V6ONLY));
 }
 
-void ExportFunctions (Handle<Object> target) {
-	Nan::Set(target, Nan::New("createChecksum").ToLocalChecked(), Nan::New<FunctionTemplate>(CreateChecksum)->GetFunction ());
+void ExportFunctions (Local<Object> target) {
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
+
+	Nan::Set(target, Nan::New("createChecksum").ToLocalChecked(), Nan::New<FunctionTemplate>(CreateChecksum)->GetFunction (context).ToLocalChecked());
 	
-	Nan::Set(target, Nan::New("htonl").ToLocalChecked(), Nan::New<FunctionTemplate>(Htonl)->GetFunction ());
-	Nan::Set(target, Nan::New("htons").ToLocalChecked(), Nan::New<FunctionTemplate>(Htons)->GetFunction ());
-	Nan::Set(target, Nan::New("ntohl").ToLocalChecked(), Nan::New<FunctionTemplate>(Ntohl)->GetFunction ());
-	Nan::Set(target, Nan::New("ntohs").ToLocalChecked(), Nan::New<FunctionTemplate>(Ntohs)->GetFunction ());
+	Nan::Set(target, Nan::New("htonl").ToLocalChecked(), Nan::New<FunctionTemplate>(Htonl)->GetFunction (context).ToLocalChecked());
+	Nan::Set(target, Nan::New("htons").ToLocalChecked(), Nan::New<FunctionTemplate>(Htons)->GetFunction (context).ToLocalChecked());
+	Nan::Set(target, Nan::New("ntohl").ToLocalChecked(), Nan::New<FunctionTemplate>(Ntohl)->GetFunction (context).ToLocalChecked());
+	Nan::Set(target, Nan::New("ntohs").ToLocalChecked(), Nan::New<FunctionTemplate>(Ntohs)->GetFunction (context).ToLocalChecked());
 }
 
-void SocketWrap::Init (Handle<Object> exports) {
+void SocketWrap::Init (Local<Object> exports) {
 	Nan::HandleScope scope;
 
 	Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(SocketWrap::New);
@@ -295,6 +300,8 @@ NAN_METHOD(SocketWrap::Close) {
 
 void SocketWrap::CloseSocket (void) {
 	Nan::HandleScope scope;
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 	
 	if (this->poll_initialised_) {
 		uv_close ((uv_handle_t *) this->poll_watcher_, OnClose);
@@ -310,7 +317,7 @@ void SocketWrap::CloseSocket (void) {
 		Local<Value> args[1];
 		args[0] = Nan::New<String>("close").ToLocalChecked();
 
-		cb->Call (handle(), 1, args);
+		cb->Call (context, handle(), 1, args);
 	}
 }
 
@@ -363,6 +370,8 @@ int SocketWrap::CreateSocket (void) {
 
 NAN_METHOD(SocketWrap::GetOption) {
 	Nan::HandleScope scope;
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 	
 	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
 	
@@ -392,7 +401,7 @@ NAN_METHOD(SocketWrap::GetOption) {
 		return;
 	}
 	
-	Local<Object> buffer = info[2]->ToObject ();
+	Local<Object> buffer = info[2]->ToObject (context).ToLocalChecked();
 	val = node::Buffer::Data (buffer);
 
 	if (! info[3]->IsInt32 ()) {
@@ -417,6 +426,8 @@ NAN_METHOD(SocketWrap::GetOption) {
 
 void SocketWrap::HandleIOEvent (int status, int revents) {
 	Nan::HandleScope scope;
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
 	if (status) {
 		Local<Value> emit = handle()->Get (Nan::New<String>("emit").ToLocalChecked());
@@ -435,7 +446,7 @@ void SocketWrap::HandleIOEvent (int status, int revents) {
 		sprintf(status_str, "%d", status);
 		args[1] = Nan::Error(status_str);
 
-		cb->Call (handle(), 2, args);
+		cb->Call (context, handle(), 2, args);
 	} else {
 		Local<Value> emit = handle()->Get (Nan::New<String>("emit").ToLocalChecked());
 		Local<Function> cb = emit.As<Function> ();
@@ -446,7 +457,7 @@ void SocketWrap::HandleIOEvent (int status, int revents) {
 		else
 			args[0] = Nan::New<String>("sendReady").ToLocalChecked();
 
-		cb->Call (handle(), 1, args);
+		cb->Call (context, handle(), 1, args);
 	}
 }
 
@@ -503,6 +514,8 @@ void SocketWrap::OnClose (uv_handle_t *handle) {
 
 NAN_METHOD(SocketWrap::Pause) {
 	Nan::HandleScope scope;
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 	
 	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
 
@@ -515,13 +528,13 @@ NAN_METHOD(SocketWrap::Pause) {
 		Nan::ThrowTypeError("Recv argument must be a boolean");
 		return;
 	}
-	bool pause_recv = info[0]->ToBoolean ()->Value ();
+	bool pause_recv = info[0]->ToBoolean (context).ToLocalChecked()->Value ();
 
 	if (! info[1]->IsBoolean ()) {
 		Nan::ThrowTypeError("Send argument must be a boolean");
 		return;
 	}
-	bool pause_send = info[1]->ToBoolean ()->Value ();
+	bool pause_send = info[1]->ToBoolean (context).ToLocalChecked()->Value ();
 	
 	int events = (pause_recv ? 0 : UV_READABLE)
 			| (pause_send ? 0 : UV_WRITABLE);
@@ -539,6 +552,8 @@ NAN_METHOD(SocketWrap::Recv) {
 	Nan::HandleScope scope;
 	
 	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 	Local<Object> buffer;
 	sockaddr_in sin_address;
 	sockaddr_in6 sin6_address;
@@ -568,7 +583,7 @@ NAN_METHOD(SocketWrap::Recv) {
 		Nan::ThrowTypeError("Buffer argument must be a node Buffer object");
 		return;
 	} else {
-		buffer = info[0]->ToObject ();
+		buffer = info[0]->ToObject (context).ToLocalChecked();
 	}
 
 	if (! info[1]->IsFunction ()) {
@@ -617,7 +632,7 @@ NAN_METHOD(SocketWrap::Recv) {
 	argv[0] = info[0];
 	argv[1] = Nan::New<Number>(rc);
 	argv[2] = Nan::New(addr).ToLocalChecked();
-	cb->Call (socket->handle(), argc, argv);
+	cb->Call (context, socket->handle(), argc, argv);
 	
 	info.GetReturnValue().Set(info.This());
 }
@@ -652,6 +667,8 @@ NAN_METHOD(SocketWrap::Send) {
 	Nan::HandleScope scope;
 	
 	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 	Local<Object> buffer;
 	uint32_t offset;
 	uint32_t length;
@@ -694,7 +711,7 @@ NAN_METHOD(SocketWrap::Send) {
 		return;
 	}
 	
-	buffer = info[0]->ToObject ();
+	buffer = info[0]->ToObject (context).ToLocalChecked();
 	offset = Nan::To<Uint32>(info[1]).ToLocalChecked()->Value();
 	length = Nan::To<Uint32>(info[2]).ToLocalChecked()->Value();
 
@@ -757,7 +774,7 @@ NAN_METHOD(SocketWrap::Send) {
 	const unsigned argc = 1;
 	Local<Value> argv[argc];
 	argv[0] = Nan::New<Number>(rc);
-	cb->Call (socket->handle(), argc, argv);
+	cb->Call (context, socket->handle(), argc, argv);
 	
 	info.GetReturnValue().Set(info.This());
 }
@@ -766,6 +783,8 @@ NAN_METHOD(SocketWrap::SetOption) {
 	Nan::HandleScope scope;
 	
 	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 	
 	if (info.Length () < 3) {
 		Nan::ThrowError("Three or four arguments are required");
@@ -794,7 +813,7 @@ NAN_METHOD(SocketWrap::SetOption) {
 			return;
 		}
 		
-		Local<Object> buffer = info[2]->ToObject ();
+		Local<Object> buffer = info[2]->ToObject (context).ToLocalChecked ();
 		val = node::Buffer::Data (buffer);
 
 		if (! info[3]->IsInt32 ()) {
