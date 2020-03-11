@@ -262,6 +262,8 @@ void ExportFunctions (Local<Object> target) {
 
 void SocketWrap::Init (Local<Object> exports) {
 	Nan::HandleScope scope;
+	v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
 	Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(SocketWrap::New);
 	tpl->SetClassName(Nan::New("SocketWrap").ToLocalChecked());
@@ -275,7 +277,7 @@ void SocketWrap::Init (Local<Object> exports) {
 	Nan::SetPrototypeMethod(tpl, "setOption", SetOption);
 
 	SocketWrap_constructor.Reset(tpl);
-	exports->Set(Nan::New("SocketWrap").ToLocalChecked(),
+	exports->Set(context, Nan::New("SocketWrap").ToLocalChecked(),
 			Nan::GetFunction(tpl).ToLocalChecked());
 }
 
@@ -311,8 +313,8 @@ void SocketWrap::CloseSocket (void) {
 	}
 
 	if (! this->deconstructing_) {
-		Local<Value> emit = handle()->Get(Nan::New<String>("emit").ToLocalChecked());
-		Local<Function> cb = emit.As<Function> ();
+		MaybeLocal<Value> emit = handle()->Get(context, Nan::New<String>("emit").ToLocalChecked());
+		Local<Function> cb = emit.ToLocalChecked().As<Function> ();
 
 		Local<Value> args[1];
 		args[0] = Nan::New<String>("close").ToLocalChecked();
@@ -430,8 +432,8 @@ void SocketWrap::HandleIOEvent (int status, int revents) {
   	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
 	if (status) {
-		Local<Value> emit = handle()->Get (Nan::New<String>("emit").ToLocalChecked());
-		Local<Function> cb = emit.As<Function> ();
+		MaybeLocal<Value> emit = handle()->Get (context, Nan::New<String>("emit").ToLocalChecked());
+		Local<Function> cb = emit.ToLocalChecked().As<Function> ();
 
 		Local<Value> args[2];
 		args[0] = Nan::New<String>("error").ToLocalChecked();
@@ -448,8 +450,8 @@ void SocketWrap::HandleIOEvent (int status, int revents) {
 
 		cb->Call (context, handle(), 2, args);
 	} else {
-		Local<Value> emit = handle()->Get (Nan::New<String>("emit").ToLocalChecked());
-		Local<Function> cb = emit.As<Function> ();
+		MaybeLocal<Value> emit = handle()->Get (context, Nan::New<String>("emit").ToLocalChecked());
+		Local<Function> cb = emit.ToLocalChecked().As<Function> ();
 
 		Local<Value> args[1];
 		if (revents & UV_READABLE)
@@ -528,13 +530,13 @@ NAN_METHOD(SocketWrap::Pause) {
 		Nan::ThrowTypeError("Recv argument must be a boolean");
 		return;
 	}
-	bool pause_recv = info[0]->ToBoolean (context).ToLocalChecked()->Value ();
+	bool pause_recv = info[0]->ToBoolean (isolate)->Value ();
 
 	if (! info[1]->IsBoolean ()) {
 		Nan::ThrowTypeError("Send argument must be a boolean");
 		return;
 	}
-	bool pause_send = info[1]->ToBoolean (context).ToLocalChecked()->Value ();
+	bool pause_send = info[1]->ToBoolean (isolate)->Value ();
 	
 	int events = (pause_recv ? 0 : UV_READABLE)
 			| (pause_send ? 0 : UV_WRITABLE);
