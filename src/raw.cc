@@ -232,7 +232,10 @@ void ExportConstants (Local<Object> target) {
 	Nan::Set(socket_option, Nan::New("SO_SNDTIMEO").ToLocalChecked(), Nan::New<Number>(SO_SNDTIMEO));
 
 #ifdef __linux__
-	Nan::Set(socket_option, Nan::New("SO_BINDTODEVICE").ToLocalChecked(), Nan::New<Number>(SO_BINDTODEVICE));
+	Nan::Set(socket_option, Nan::New("SO_BINDTODEVICE").ToLocalChecked(), Nan::New<Number>(SO_BINDTODEVICE));	
+	Nan::Set(socket_option, Nan::New("IP_MTU_DISCOVER").ToLocalChecked(), Nan::New<Number>(IP_MTU_DISCOVER));
+	Nan::Set(socket_option, Nan::New("IP_PMTUDISC_DO").ToLocalChecked(), Nan::New<Number>(IP_PMTUDISC_DO));
+	Nan::Set(socket_option, Nan::New("IP_PMTUDISC_DONT").ToLocalChecked(), Nan::New<Number>(IP_PMTUDISC_DONT));
 #endif
 
 	Nan::Set(socket_option, Nan::New("IP_HDRINCL").ToLocalChecked(), Nan::New<Number>(IP_HDRINCL));
