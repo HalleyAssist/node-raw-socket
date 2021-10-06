@@ -60,6 +60,8 @@ function Socket (options) {
 	this.wrap.on ("recvReady", this.onRecvReady.bind (me));
 	this.wrap.on ("error", this.onError.bind (me));
 	this.wrap.on ("close", this.onClose.bind (me));
+
+	this._gcFix = setInterval(()=>this.wrap, 2147483647).unref();
 };
 
 util.inherits (Socket, events.EventEmitter);
@@ -75,6 +77,7 @@ Socket.prototype.getOption = function (level, option, value, length) {
 
 Socket.prototype.onClose = function () {
 	this.emit ("close");
+	clearInterval(this._gcFix)
 }
 
 Socket.prototype.onError = function (error) {
