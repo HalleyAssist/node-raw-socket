@@ -249,6 +249,8 @@ void ExportConstants (Local<Object> target) {
 	Nan::Set(socket_option, Nan::New("IPV6_TTL").ToLocalChecked(), Nan::New<Number>(IPV6_UNICAST_HOPS));
 	Nan::Set(socket_option, Nan::New("IPV6_UNICAST_HOPS").ToLocalChecked(), Nan::New<Number>(IPV6_UNICAST_HOPS));
 	Nan::Set(socket_option, Nan::New("IPV6_V6ONLY").ToLocalChecked(), Nan::New<Number>(IPV6_V6ONLY));
+	
+	Nan::Set(socket_level, Nan::New("TCP_KEEPCNT").ToLocalChecked(), Nan::New<Number>(TCP_KEEPCNT));
 }
 
 void ExportFunctions (Local<Object> target) {
