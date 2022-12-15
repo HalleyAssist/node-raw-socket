@@ -62,7 +62,7 @@ function Socket (options) {
 	this.wrap.on ("close", this.onClose.bind (me));
 
 	this._gcFix = setInterval(()=>this.wrap, 2147483647).unref();
-};
+}
 
 util.inherits (Socket, events.EventEmitter);
 
