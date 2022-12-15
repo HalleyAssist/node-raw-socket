@@ -4,32 +4,6 @@ var net = require ("net");
 var raw = require ("./build/Release/raw.node");
 var util = require ("util");
 
-function _expandConstantObject (object) {
-	var keys = [];
-	for (key in object)
-		keys.push (key);
-	for (var i = 0; i < keys.length; i++)
-		object[object[keys[i]]] = parseInt (keys[i]);
-}
-
-var AddressFamily = {
-	0: "Raw",
-	1: "IPv4",
-	2: "IPv6"
-};
-
-_expandConstantObject (AddressFamily);
-
-var Protocol = {
-	0: "None",
-	1: "ICMP",
-	6: "TCP",
-	17: "UDP",
-	58: "ICMPv6"
-};
-
-_expandConstantObject (Protocol);
-
 for (var key in events.EventEmitter.prototype) {
   raw.SocketWrap.prototype[key] = events.EventEmitter.prototype[key];
 }
@@ -45,15 +19,20 @@ function Socket (options) {
 	this.recvPaused = false;
 	this.sendPaused = true;
 
+	const addressFamily = ((options && options.addressFamily === undefined)
+		? exports.AddressFamily.IPv4
+		: options.addressFamily)
 	this.wrap = new raw.SocketWrap (
 			((options && options.protocol)
 					? options.protocol
 					: 0),
-			((options && options.addressFamily === undefined)
-					? AddressFamily.IPv4
-					: options.addressFamily)
+			addressFamily
 		);
 	this.options = options
+
+	if(addressFamily == exports.AddressFamily.AF_BLUETOOTH) {
+		this.wrap.BindBluetooth(options.hciDevice)
+	}
 
 	var me = this;
 	this.wrap.on ("sendReady", this.onSendReady.bind (me));
@@ -155,7 +134,9 @@ Socket.prototype.send = function (buffer, offset, length, address,
 		return this;
 	}
 
-	if (this.options.addressFamily != 0 && ! net.isIP (address)) {
+	if (
+		(this.options.addressFamily == exports.AddressFamily.IPv4 || this.options.addressFamily == exports.AddressFamily.IPv6)
+		&& ! net.isIP (address)) {
 		afterCallback.call (this, new Error ("Invalid IP address '" + address + "'"));
 		return this;
 	}
@@ -207,13 +188,25 @@ exports.createSocket = function (options) {
 	return new Socket (options || {});
 };
 
-exports.AddressFamily = AddressFamily;
-exports.Protocol = Protocol;
-
 exports.Socket = Socket;
 
 exports.SocketLevel = raw.SocketLevel;
 exports.SocketOption = raw.SocketOption;
+exports.SocketProtocol = exports.Protocol = raw.SocketProtocol;
+
+const IpProtocols = {
+	"None" : 0,
+	"ICMP" : 1,
+	"TCP" : 6,
+	"UDP" : 17,
+	"ICMPv6" : 58
+}
+Object.assign(exports.Protocol, IpProtocols)
+
+exports.AddressFamily = raw.AddressFamily
+exports.AddressFamily.Raw = exports.AddressFamily.PF_PACKET
+exports.AddressFamily.IPv4 = exports.AddressFamily.AF_INET
+exports.AddressFamily.IPv6 = exports.AddressFamily.AF_INET6
 
 exports.htonl = raw.htonl;
 exports.htons = raw.htons;

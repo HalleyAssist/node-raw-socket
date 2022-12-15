@@ -12,6 +12,108 @@
 #include <linux/if_arp.h>
 #include <net/ethernet.h> /* the L2 protocols */
 
+
+
+#define BTPROTO_L2CAP 0
+#define BTPROTO_HCI 1
+
+#define SOL_HCI 0
+#define HCI_FILTER 2
+
+#define HCIGETDEVLIST _IOR('H', 210, int)
+#define HCIGETDEVINFO _IOR('H', 211, int)
+
+#define HCI_CHANNEL_RAW 0
+#define HCI_CHANNEL_USER 1
+#define HCI_CHANNEL_CONTROL 3
+
+#define HCI_DEV_NONE 0xffff
+
+#define HCI_MAX_DEV 16
+
+
+enum
+{
+  HCI_UP,
+  HCI_INIT,
+  HCI_RUNNING,
+
+  HCI_PSCAN,
+  HCI_ISCAN,
+  HCI_AUTH,
+  HCI_ENCRYPT,
+  HCI_INQUIRY,
+
+  HCI_RAW,
+};
+
+typedef struct bdaddr_s {
+  uint8_t b[6];
+
+  bool operator<(const struct bdaddr_s& r) const {
+    for(int i = 0; i < 6; i++) {
+      if(b[i] > r.b[i]) {
+        return false;
+      }
+    }
+    return b[5] < r.b[5];
+  }
+
+} __attribute__((packed)) bdaddr_t;
+
+
+struct sockaddr_hci
+{
+  sa_family_t hci_family;
+  unsigned short hci_dev;
+  unsigned short hci_channel;
+};
+
+struct hci_dev_req
+{
+  uint16_t dev_id;
+  uint32_t dev_opt;
+};
+
+struct hci_dev_list_req
+{
+  uint16_t dev_num;
+  struct hci_dev_req dev_req[0];
+};
+
+struct hci_dev_info
+{
+  uint16_t dev_id;
+  char name[8];
+
+  bdaddr_t bdaddr;
+
+  uint32_t flags;
+  uint8_t type;
+
+  uint8_t features[8];
+
+  uint32_t pkt_type;
+  uint32_t link_policy;
+  uint32_t link_mode;
+
+  uint16_t acl_mtu;
+  uint16_t acl_pkts;
+  uint16_t sco_mtu;
+  uint16_t sco_pkts;
+
+  // hci_dev_stats
+  uint32_t err_rx;
+  uint32_t err_tx;
+  uint32_t cmd_tx;
+  uint32_t evt_rx;
+  uint32_t acl_tx;
+  uint32_t acl_rx;
+  uint32_t sco_tx;
+  uint32_t sco_rx;
+  uint32_t byte_rx;
+  uint32_t byte_tx;
+};
 #ifdef _WIN32
 static char errbuf[1024];
 #endif
@@ -217,9 +319,13 @@ NAN_METHOD(Ntohs) {
 void ExportConstants (Local<Object> target) {
 	Local<Object> socket_level = Nan::New<Object>();
 	Local<Object> socket_option = Nan::New<Object>();
+	Local<Object> address_family = Nan::New<Object>();
+	Local<Object> socket_protocol = Nan::New<Object>();
 
 	Nan::Set(target, Nan::New("SocketLevel").ToLocalChecked(), socket_level);
 	Nan::Set(target, Nan::New("SocketOption").ToLocalChecked(), socket_option);
+	Nan::Set(target, Nan::New("AddressFamily").ToLocalChecked(), address_family);
+	Nan::Set(target, Nan::New("SocketProtocol").ToLocalChecked(), socket_protocol);
 
 	Nan::Set(socket_level, Nan::New("SOL_SOCKET").ToLocalChecked(), Nan::New<Number>(SOL_SOCKET));
 	Nan::Set(socket_level, Nan::New("IPPROTO_IP").ToLocalChecked(), Nan::New<Number>(IPPROTO_IP + 0));
@@ -251,6 +357,16 @@ void ExportConstants (Local<Object> target) {
 	Nan::Set(socket_option, Nan::New("IPV6_V6ONLY").ToLocalChecked(), Nan::New<Number>(IPV6_V6ONLY));
 	
 	Nan::Set(socket_level, Nan::New("TCP_KEEPCNT").ToLocalChecked(), Nan::New<Number>(TCP_KEEPCNT));
+
+
+	Nan::Set(address_family, Nan::New("AF_INET").ToLocalChecked(), Nan::New<Number>(AF_INET));
+	Nan::Set(address_family, Nan::New("AF_INET6").ToLocalChecked(), Nan::New<Number>(AF_INET6));
+	Nan::Set(address_family, Nan::New("PF_PACKET").ToLocalChecked(), Nan::New<Number>(PF_PACKET));
+	Nan::Set(address_family, Nan::New("AF_BLUETOOTH").ToLocalChecked(), Nan::New<Number>(AF_BLUETOOTH));
+
+	
+	Nan::Set(socket_protocol, Nan::New("BTPROTO_HCI").ToLocalChecked(), Nan::New<Number>(BTPROTO_HCI));
+	Nan::Set(socket_protocol, Nan::New("BTPROTO_L2CAP").ToLocalChecked(), Nan::New<Number>(BTPROTO_L2CAP));
 }
 
 void ExportFunctions (Local<Object> target) {
@@ -280,6 +396,7 @@ void SocketWrap::Init (Local<Object> exports) {
 	Nan::SetPrototypeMethod(tpl, "recv", Recv);
 	Nan::SetPrototypeMethod(tpl, "send", Send);
 	Nan::SetPrototypeMethod(tpl, "setOption", SetOption);
+	Nan::SetPrototypeMethod(tpl, "bindBluetooth", BindBluetooth);
 
 	SocketWrap_constructor.Reset(tpl);
 	exports->Set(context, Nan::New("SocketWrap").ToLocalChecked(),
@@ -352,6 +469,7 @@ int SocketWrap::CreateSocket (void) {
 	if (this->poll_fd_ == INVALID_SOCKET)
 		return SOCKET_ERRNO;
 
+	// make the socket non-blocking
 #ifdef _WIN32
 	unsigned long flag = 1;
 	if (ioctlsocket (this->poll_fd_, FIONBIO, &flag) == SOCKET_ERROR)
@@ -472,31 +590,24 @@ NAN_METHOD(SocketWrap::New) {
 	Nan::HandleScope scope;
 	
 	SocketWrap* socket = new SocketWrap ();
-	int rc, family = AF_INET;
+	int rc, family;
 	
-	if (info.Length () < 1) {
-		Nan::ThrowError("One argument is required");
+	if (info.Length () < 2) {
+		Nan::ThrowError("Two arguments are required");
 		return;
 	}
 	
 	if (! info[0]->IsUint32 ()) {
 		Nan::ThrowTypeError("Protocol argument must be an unsigned integer");
 		return;
-	} else {
-		socket->protocol_ = Nan::To<Uint32>(info[0]).ToLocalChecked()->Value();
 	}
+	socket->protocol_ = Nan::To<Uint32>(info[0]).ToLocalChecked()->Value();
 
-	if (info.Length () > 1) {
-		if (! info[1]->IsUint32 ()) {
-			Nan::ThrowTypeError("Address family argument must be an unsigned integer");
-			return;
-		} else {
-			if (Nan::To<Uint32>(info[1]).ToLocalChecked()->Value() == 0)
-				family = PF_PACKET;
-			else if (Nan::To<Uint32>(info[1]).ToLocalChecked()->Value() == 2)
-				family = AF_INET6;
-		}
+	if (! info[1]->IsUint32 ()) {
+		Nan::ThrowTypeError("Address family argument must be an unsigned integer");
+		return;
 	}
+	family = Nan::To<Uint32>(info[1]).ToLocalChecked()->Value();
 	
 	socket->family_ = family;
 	
@@ -522,7 +633,6 @@ void SocketWrap::OnClose (uv_handle_t *handle) {
 NAN_METHOD(SocketWrap::Pause) {
 	Nan::HandleScope scope;
 	v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 	
 	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
 
@@ -701,12 +811,7 @@ NAN_METHOD(SocketWrap::Send) {
 		Nan::ThrowTypeError("Length argument must be an unsigned integer");
 		return;
 	}
-
-	if (! info[3]->IsString ()) {
-		Nan::ThrowTypeError("Address argument must be a string");
-		return;
-	}
-
+	
 	if (! info[4]->IsFunction ()) {
 		Nan::ThrowTypeError("Callback argument must be a function");
 		return;
@@ -725,6 +830,11 @@ NAN_METHOD(SocketWrap::Send) {
 	data = node::Buffer::Data (buffer) + offset;
 	
 	if (socket->family_ == AF_INET6) {
+		if (! info[3]->IsString ()) {
+			Nan::ThrowTypeError("Address argument must be a string");
+			return;
+		}
+
 #if UV_VERSION_MAJOR > 0
 		struct sockaddr_in6 addr;
 
@@ -737,6 +847,11 @@ NAN_METHOD(SocketWrap::Send) {
 		rc = sendto (socket->poll_fd_, data, length, 0,
 				(struct sockaddr *) &addr, sizeof (addr));
 	} else if (socket->family_ == AF_INET) {
+		if (! info[3]->IsString ()) {
+			Nan::ThrowTypeError("Address argument must be a string");
+			return;
+		}
+		
 #if UV_VERSION_MAJOR > 0
 		struct sockaddr_in addr;
 		uv_ip4_addr(*Nan::Utf8String(info[3]), 0, &addr);
@@ -747,7 +862,7 @@ NAN_METHOD(SocketWrap::Send) {
 
 		rc = sendto (socket->poll_fd_, data, length, 0,
 				(struct sockaddr *) &addr, sizeof (addr));
-	} else {
+	} else if (socket->family_ == PF_PACKET) {
 		struct sockaddr_ll addr;
 		Nan::Utf8String address (info[3]);
 		int ifindex = find_and_set_index(socket->poll_fd_, *address, addr.sll_addr);
@@ -770,6 +885,8 @@ NAN_METHOD(SocketWrap::Send) {
 
 		rc = sendto (socket->poll_fd_, data, length, 0,
 				(struct sockaddr *) &addr, sizeof (addr));
+	} else {
+		rc = ::send(socket->poll_fd_, data, length, 0);
 	}
 	
 	if (rc == SOCKET_ERROR) {
@@ -853,6 +970,81 @@ NAN_METHOD(SocketWrap::SetOption) {
 	}
 	
 	info.GetReturnValue().Set(info.This());
+}
+
+static int devIdFor(int _socket, const int *pDevId, bool isUp)
+{
+  int devId = 0; // default
+
+  if (pDevId == nullptr)
+  {
+    struct hci_dev_list_req *dl;
+    struct hci_dev_req *dr;
+
+    dl = (hci_dev_list_req *)calloc(HCI_MAX_DEV * sizeof(*dr) + sizeof(*dl), 1);
+    dr = dl->dev_req;
+
+    dl->dev_num = HCI_MAX_DEV;
+
+    if (ioctl(_socket, HCIGETDEVLIST, dl) > -1)
+    {
+      for (int i = 0; i < dl->dev_num; i++, dr++)
+      {
+        bool devUp = dr->dev_opt & (1 << HCI_UP);
+        bool match = (isUp == devUp);
+
+        if (match)
+        {
+          // choose the first device that is match
+          // later on, it would be good to also HCIGETDEVINFO and check the HCI_RAW flag
+          devId = dr->dev_id;
+          break;
+        }
+      }
+    }
+
+    free(dl);
+  }
+  else
+  {
+    devId = *pDevId;
+  }
+
+  return devId;
+}
+
+
+NAN_METHOD(SocketWrap::BindBluetooth)
+{
+	Nan::HandleScope scope;
+
+	struct sockaddr_hci a = {};
+	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
+
+	int devId = 0;
+	int* pDevId = nullptr;
+
+	if (info.Length() > 0)
+	{
+		Local<Value> arg0 = info[0];
+		if (arg0->IsInt32() || arg0->IsUint32())
+		{
+			devId = Nan::To<int32_t>(arg0).FromJust();
+			pDevId = &devId;
+		}
+	}
+
+	a.hci_family = AF_BLUETOOTH;
+	a.hci_dev = devIdFor(socket->poll_fd_, pDevId, true);
+	a.hci_channel = HCI_CHANNEL_USER;
+
+	if (bind(socket->poll_fd_, (struct sockaddr *)&a, sizeof(a)) < 0)
+	{
+		Nan::ThrowError(Nan::ErrnoException(errno, "bind"));
+		devId = -1;
+	}
+
+	info.GetReturnValue().Set(devId);
 }
 
 static void IoEvent (uv_poll_t* watcher, int status, int revents) {

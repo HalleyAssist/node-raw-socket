@@ -84,6 +84,7 @@ private:
 	static NAN_METHOD(Recv);
 	static NAN_METHOD(Send);
 	static NAN_METHOD(SetOption);
+	static NAN_METHOD(BindBluetooth);
 
 	bool no_ip_header_;
 
