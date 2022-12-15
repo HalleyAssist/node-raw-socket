@@ -831,7 +831,7 @@ NAN_METHOD(SocketWrap::Send) {
 	
 	if (socket->family_ == AF_INET6) {
 		if (! info[3]->IsString ()) {
-			Nan::ThrowTypeError("Address argument must be a string");
+			Nan::ThrowTypeError("IPv6 Address argument must be a string");
 			return;
 		}
 
@@ -848,7 +848,7 @@ NAN_METHOD(SocketWrap::Send) {
 				(struct sockaddr *) &addr, sizeof (addr));
 	} else if (socket->family_ == AF_INET) {
 		if (! info[3]->IsString ()) {
-			Nan::ThrowTypeError("Address argument must be a string");
+			Nan::ThrowTypeError("IPv4 Address argument must be a string");
 			return;
 		}
 		
@@ -863,6 +863,11 @@ NAN_METHOD(SocketWrap::Send) {
 		rc = sendto (socket->poll_fd_, data, length, 0,
 				(struct sockaddr *) &addr, sizeof (addr));
 	} else if (socket->family_ == PF_PACKET) {
+		if (! info[3]->IsString ()) {
+			Nan::ThrowTypeError("Interface Address argument must be a string");
+			return;
+		}
+
 		struct sockaddr_ll addr;
 		Nan::Utf8String address (info[3]);
 		int ifindex = find_and_set_index(socket->poll_fd_, *address, addr.sll_addr);
