@@ -1,7 +1,7 @@
 
 const {EventEmitter} = require ("events"),
-      net = require ("net"),
-	  raw = require ("./build/Release/raw.node");
+	net = require ("net"),
+	raw = require ("./build/Release/raw.node");
 
 for (const key in EventEmitter.prototype) {
   raw.SocketWrap.prototype[key] = EventEmitter.prototype[key];
@@ -31,7 +31,7 @@ class Socket extends EventEmitter {
 		this.options = options
 
 		if(addressFamily == exports.AddressFamily.AF_BLUETOOTH) {
-			this.wrap.BindBluetooth(options.hciDevice)
+			this.wrap.bindBluetooth(options.hciDevice)
 		}
 
 		var me = this;
