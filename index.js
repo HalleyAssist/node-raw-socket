@@ -12,7 +12,7 @@ class Socket extends EventEmitter {
 		super()
 
 		this.requests = [];
-		this.buffer = Buffer.alloc ((options && options.bufferSize)
+		this.buffer = Buffer.alloc ((options && options.bufferSize !== undefined)
 				? options.bufferSize
 				: 4096);
 
