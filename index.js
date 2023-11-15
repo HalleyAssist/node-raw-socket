@@ -32,7 +32,7 @@ class Socket extends EventEmitter {
 			this.wrap.bindBluetooth(options.hciDevice)
 		}
 
-		var me = this;
+		let me = this;
 		this.wrap.on ("sendReady", this.onSendReady.bind (me));
 		this.wrap.on ("recvReady", this.onRecvReady.bind (me));
 		this.wrap.on ("error", this.onError.bind (me));
@@ -71,10 +71,10 @@ class Socket extends EventEmitter {
 	}
 	
 	onRecvReady () {
-		var me = this;
+		const me = this;
 		try {
 			this.wrap.recv (this.buffer, function (buffer, bytes, source) {
-				var newBuffer = buffer.slice (0, bytes);
+				const newBuffer = buffer.slice (0, bytes);
 				me.emit ("message", newBuffer, source, buffer);
 			});
 		} catch (error) {
@@ -84,8 +84,8 @@ class Socket extends EventEmitter {
 	
 	onSendReady () {
 		if (this.requests.length > 0) {
-			var me = this;
-			var req = this.requests.shift ();
+			const me = this;
+			const req = this.requests.shift ();
 			try {
 				if (req.beforeCallback)
 					req.beforeCallback ();
@@ -147,7 +147,7 @@ class Socket extends EventEmitter {
 			return this;
 		}
 	
-		var req = {
+		const req = {
 			buffer: buffer,
 			offset: offset,
 			length: length,
@@ -172,9 +172,9 @@ class Socket extends EventEmitter {
 }
 
 exports.createChecksum = function () {
-	var sum = 0;
-	for (var i = 0; i < arguments.length; i++) {
-		var object = arguments[i];
+	let sum = 0;
+	for (let i = 0; i < arguments.length; i++) {
+		const object = arguments[i];
 		if (object instanceof Buffer) {
 			sum = raw.createChecksum (sum, object, 0, object.length);
 		} else {
