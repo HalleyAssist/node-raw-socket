@@ -12,7 +12,7 @@ class Socket extends EventEmitter {
 		super()
 
 		this.requests = [];
-		this.buffer = Buffer.alloc ((options && options.bufferSize !== undefined)
+		this._buffer = Buffer.alloc ((options && options.bufferSize !== undefined)
 				? options.bufferSize
 				: 4096);
 
@@ -41,6 +41,10 @@ class Socket extends EventEmitter {
 		this.wrap.on ("close", this.onClose.bind (me));
 
 		this._gcFix = setInterval(()=>this.wrap, 2147483647).unref();
+	}
+
+	get buffer(){
+		return this._buffer
 	}
 
 	close () {
