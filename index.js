@@ -75,7 +75,7 @@ class Socket extends EventEmitter {
 		try {
 			this.wrap.recv (this.buffer, function (buffer, bytes, source) {
 				var newBuffer = buffer.slice (0, bytes);
-				me.emit ("message", newBuffer, source);
+				me.emit ("message", newBuffer, source, buffer);
 			});
 		} catch (error) {
 			me.emit ("error", error);
