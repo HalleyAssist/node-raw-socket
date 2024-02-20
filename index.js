@@ -39,6 +39,8 @@ class Socket extends EventEmitter {
 		this.wrap.on ("close", this.onClose.bind (me));
 
 		this._gcFix = setInterval(()=>this.wrap, 2147483647).unref();
+
+		this.maxRecvPackets = 1
 	}
 
 	bufferAlloc(options){
@@ -73,6 +75,7 @@ class Socket extends EventEmitter {
 	onRecvReady () {
 		let buffer = this.buffer
 		try {
+			let remaining = this.maxRecvPackets
 			this.wrap.recv (buffer, (bytes, source)=>{
 				if(bytes < 0) {
 					this.emit ("return", buffer);
@@ -80,7 +83,7 @@ class Socket extends EventEmitter {
 				}
 				const newBuffer = buffer.slice (0, bytes);
 				this.emit ("message", newBuffer, source, buffer);
-				if(this.recvPaused) {
+				if(this.recvPaused || --remaining == 0) {
 					return
 				}
 				buffer = this.buffer
