@@ -71,14 +71,23 @@ class Socket extends EventEmitter {
 	}
 	
 	onRecvReady () {
-		const me = this;
+		let buffer = this.buffer
 		try {
-			this.wrap.recv (this.buffer, function (buffer, bytes, source) {
+			this.wrap.recv (buffer, (bytes, source)=>{
+				if(bytes < 0) {
+					this.emit ("return", buffer);
+					return
+				}
 				const newBuffer = buffer.slice (0, bytes);
-				me.emit ("message", newBuffer, source, buffer);
-			});
+				this.emit ("message", newBuffer, source, buffer);
+				if(this.recvPaused) {
+					return
+				}
+				buffer = this.buffer
+				return buffer
+			})
 		} catch (error) {
-			me.emit ("error", error);
+			this.emit ("error", error, buffer);
 		}
 	}
 	

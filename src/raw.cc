@@ -672,9 +672,7 @@ NAN_METHOD(SocketWrap::Recv) {
 	v8::Isolate* isolate = v8::Isolate::GetCurrent();
   	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 	Local<Object> buffer;
-	sockaddr_in sin_address;
-	sockaddr_in6 sin6_address;
-	sockaddr_ll sinll_addr;
+	sockaddr_storage sin_storage;
 	char addr[50];
 	int rc;
 #ifdef _WIN32
@@ -684,15 +682,15 @@ NAN_METHOD(SocketWrap::Recv) {
 #endif
 
 	if (socket->family_ == AF_INET6) {
-		sin_length = sizeof (sin6_address);
+		sin_length = sizeof (sockaddr_in6);
 	} else if (socket->family_ == AF_INET) {
-		sin_length = sizeof (sin_address);
+		sin_length = sizeof (sockaddr_in);
 	} else {
 		sin_length = sizeof(sockaddr_ll);
 	}
 	
 	if (info.Length () < 2) {
-		Nan::ThrowError("Five arguments are required");
+		Nan::ThrowError("Two arguments are required");
 		return;
 	}
 	
@@ -714,42 +712,40 @@ NAN_METHOD(SocketWrap::Recv) {
 		return;
 	}
 
-	if (socket->family_ == AF_INET6) {
-		memset (&sin6_address, 0, sizeof (sin6_address));
-		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
-				(int) node::Buffer::Length (buffer), 0, (sockaddr *) &sin6_address,
-				&sin_length);
-	} else if(socket->family_ == AF_INET) {
-		memset (&sin_address, 0, sizeof (sin_address));
-		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
-				(int) node::Buffer::Length (buffer), 0, (sockaddr *) &sin_address,
-				&sin_length);
-	} else {
-		memset (&sinll_addr, 0, sizeof (sinll_addr));
-		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
-				(int) node::Buffer::Length (buffer), 0, (sockaddr *) &sinll_addr,
-				&sin_length);
-	}
-	
-	if (rc == SOCKET_ERROR) {
-		Nan::ThrowError(raw_strerror (SOCKET_ERRNO));
-		return;
-	}
-	
-	if (socket->family_ == AF_INET6)
-		uv_ip6_name (&sin6_address, addr, 50);
-	else if(socket->family_ == AF_INET)
-		uv_ip4_name (&sin_address, addr, 50);
-	else
-		addr[0] = 0; /* TODO */
-
+	Local<Value> argv[2];
 	Local<Function> cb = Local<Function>::Cast (info[1]);
-	const unsigned argc = 3;
-	Local<Value> argv[argc];
-	argv[0] = info[0];
-	argv[1] = Nan::New<Number>(rc);
-	argv[2] = Nan::New(addr).ToLocalChecked();
-	cb->Call (context, socket->handle(), argc, argv);
+
+	do {
+		//memset (&sin_storage, 0, sin_length);
+		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
+				(int) node::Buffer::Length (buffer), 0, (sockaddr *) &sin_storage,
+				&sin_length);
+		
+		if (rc == SOCKET_ERROR) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				argv[0] = Nan::New<Number>(-1);
+				cb->Call (context, socket->handle(), 1, argv);
+				break;
+			}
+			Nan::ThrowError(raw_strerror (SOCKET_ERRNO));
+			return;
+		}
+		
+		if (socket->family_ == AF_INET6)
+			uv_ip6_name ((sockaddr_in6*)&sin_storage, addr, 50);
+		else if(socket->family_ == AF_INET)
+			uv_ip4_name ((sockaddr_in*)&sin_storage, addr, 50);
+		else
+			addr[0] = 0; /* TODO */
+			
+		argv[0] = Nan::New<Number>(rc);
+		argv[1] = Nan::New(addr).ToLocalChecked();
+		MaybeLocal<v8::Value> newBuffer = cb->Call (context, socket->handle(), 2, argv);
+		if(!newBuffer.ToLocal(&argv[0]) || !argv[0]->IsObject() || !node::Buffer::HasInstance(argv[0])) {
+			break;
+		}
+		buffer = argv[0]->ToObject(context).ToLocalChecked();
+	} while(true);
 	
 	info.GetReturnValue().Set(info.This());
 }
