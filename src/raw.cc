@@ -714,7 +714,7 @@ NAN_METHOD(SocketWrap::Recv) {
 
 	Local<Value> argv[2];
 	Local<Function> cb = Local<Function>::Cast (info[1]);
-
+	int remaining = 4;
 	do {
 		//memset (&sin_storage, 0, sin_length);
 		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
@@ -745,7 +745,7 @@ NAN_METHOD(SocketWrap::Recv) {
 			break;
 		}
 		buffer = argv[0]->ToObject(context).ToLocalChecked();
-	} while(true);
+	} while(remaining-- != 0);
 	
 	info.GetReturnValue().Set(info.This());
 }
