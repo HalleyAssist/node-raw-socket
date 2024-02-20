@@ -517,8 +517,12 @@ NAN_METHOD(SocketWrap::Recv) {
 	
 	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
 	Local<Object> buffer;
+<<<<<<< Updated upstream
 	sockaddr_in sin_address;
 	sockaddr_in6 sin6_address;
+=======
+	sockaddr_storage sin_storage;
+>>>>>>> Stashed changes
 	char addr[50];
 	int rc;
 #ifdef _WIN32
@@ -554,6 +558,7 @@ NAN_METHOD(SocketWrap::Recv) {
 		return;
 	}
 
+<<<<<<< Updated upstream
 	if (socket->family_ == AF_INET6) {
 		memset (&sin6_address, 0, sizeof (sin6_address));
 		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
@@ -576,13 +581,44 @@ NAN_METHOD(SocketWrap::Recv) {
 	else
 		uv_ip4_name (&sin_address, addr, 50);
 	
+=======
+
+>>>>>>> Stashed changes
 	Local<Function> cb = Local<Function>::Cast (info[1]);
-	const unsigned argc = 3;
-	Local<Value> argv[argc];
 	argv[0] = info[0];
+<<<<<<< Updated upstream
 	argv[1] = Nan::New<Number>(rc);
 	argv[2] = Nan::New(addr).ToLocalChecked();
 	Nan::Call(Nan::Callback(cb), argc, argv);
+=======
+
+	do {
+		//memset (&sin_storage, 0, sin_length);
+		rc = recvfrom (socket->poll_fd_, node::Buffer::Data (buffer),
+				(int) node::Buffer::Length (buffer), 0, (sockaddr *) &sin_storage,
+				&sin_length);
+		if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			break;
+		}
+		
+		if (rc == SOCKET_ERROR) {
+			Nan::ThrowError(raw_strerror (SOCKET_ERRNO));
+			return;
+		}
+		
+		if (socket->family_ == AF_INET6)
+			uv_ip6_name ((sockaddr_in6*)&sin_storage, addr, 50);
+		else if(socket->family_ == AF_INET)
+			uv_ip4_name ((sockaddr_in*)&sin_storage, addr, 50);
+		else
+			addr[0] = 0; /* TODO */
+		const unsigned argc = 3;
+		Local<Value> argv[argc];
+		argv[1] = Nan::New<Number>(rc);
+		argv[2] = Nan::New(addr).ToLocalChecked();
+		cb->Call (context, socket->handle(), argc, argv);
+	} while(true);
+>>>>>>> Stashed changes
 	
 	info.GetReturnValue().Set(info.This());
 }
