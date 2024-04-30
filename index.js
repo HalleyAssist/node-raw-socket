@@ -104,7 +104,7 @@ class Socket extends EventEmitter {
 				this.wrap.send (req.buffer, req.offset, req.length,
 						req.address, function (bytes) {
 					req.afterCallback.call (me, null, bytes);
-				});
+				}, false);
 			} catch (error) {
 				req.afterCallback.call (me, error, 0);
 			}
@@ -159,18 +159,31 @@ class Socket extends EventEmitter {
 			return this;
 		}
 	
-		const req = {
-			buffer: buffer,
-			offset: offset,
-			length: length,
-			address: address,
-			afterCallback: afterCallback,
-			beforeCallback: beforeCallback
-		};
-		this.requests.push (req);
+		const req = { buffer, offset, length, address, afterCallback, beforeCallback };
 	
-		if (this.sendPaused)
+		if (this.sendPaused) {
+			if (req.beforeCallback)
+				req.beforeCallback ();
+			
+			try {
+				let sent = this.wrap.send (req.buffer, req.offset, req.length, req.address, (bytes) => {
+					req.afterCallback.call (this, null, bytes);
+				}, true);
+
+				if (sent) {
+					return this
+				}
+			} catch(error){
+				req.afterCallback.call (this, error, 0);
+				return
+			}
+			
+			this.requests.push (req);
+
 			this.resumeSend ();
+		} else {		
+			this.requests.push (req);
+		}
 	
 		return this;
 	}

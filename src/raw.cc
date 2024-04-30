@@ -786,9 +786,10 @@ NAN_METHOD(SocketWrap::Send) {
 	uint32_t length;
 	int rc;
 	char *data;
+	bool try_send;
 	
-	if (info.Length () < 5) {
-		Nan::ThrowError("Five arguments are required");
+	if (info.Length () < 6) {
+		Nan::ThrowError("Six arguments are required");
 		return;
 	}
 	
@@ -811,6 +812,11 @@ NAN_METHOD(SocketWrap::Send) {
 		Nan::ThrowTypeError("Callback argument must be a function");
 		return;
 	}
+	
+	if (! info[5]->IsBoolean ()) {
+		Nan::ThrowTypeError("Try argument must be a boolean");
+		return;
+	}
 
 	rc = socket->CreateSocket ();
 	if (rc != 0) {
@@ -821,6 +827,7 @@ NAN_METHOD(SocketWrap::Send) {
 	buffer = info[0]->ToObject (context).ToLocalChecked();
 	offset = Nan::To<Uint32>(info[1]).ToLocalChecked()->Value();
 	length = Nan::To<Uint32>(info[2]).ToLocalChecked()->Value();
+	try_send = info[5]->ToBoolean (isolate)->Value ();
 
 	data = node::Buffer::Data (buffer) + offset;
 	
@@ -890,6 +897,10 @@ NAN_METHOD(SocketWrap::Send) {
 	}
 	
 	if (rc == SOCKET_ERROR) {
+		if(try_send){
+			info.GetReturnValue().Set(Nan::New<Boolean>(false));
+			return;	
+		}
 		Nan::ThrowError(raw_strerror (SOCKET_ERRNO));
 		return;
 	}
