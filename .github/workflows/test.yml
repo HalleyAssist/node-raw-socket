@@ -11,5 +11,5 @@ jobs:
       run:  npm install
     - name: Install modules
       run: |
-        sudo npm install -g eslint
+        sudo npm install -g eslint@8
     - run: eslint index.js --ext .js,.jsx,.ts,.tsx
