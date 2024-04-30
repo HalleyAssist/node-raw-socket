@@ -898,7 +898,7 @@ NAN_METHOD(SocketWrap::Send) {
 	}
 	
 	if (rc == SOCKET_ERROR) {
-		if(try_send){
+		if(try_send && (errno == EAGAIN || errno == EWOULDBLOCK)){
 			info.GetReturnValue().Set(Nan::New<Boolean>(false));
 			return;	
 		}
