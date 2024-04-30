@@ -657,9 +657,10 @@ NAN_METHOD(SocketWrap::Pause) {
 			| (pause_send ? 0 : UV_WRITABLE);
 
 	if (! socket->deconstructing_ && socket->poll_initialised_) {
-		uv_poll_stop (socket->poll_watcher_);
 		if (events)
 			uv_poll_start (socket->poll_watcher_, events, IoEvent);
+		else 
+			uv_poll_stop (socket->poll_watcher_);
 	}
 	
 	info.GetReturnValue().Set(info.This());

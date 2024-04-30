@@ -137,6 +137,13 @@ class Socket extends EventEmitter {
 		this.wrap.pause (this.recvPaused, this.sendPaused);
 		return this;
 	}
+
+	pause (recv, send) {
+		this.recvPaused = recv;
+		this.sendPaused = send;
+		this.wrap.pause (this.recvPaused, this.sendPaused);
+		return this;
+	}
 	
 	send (buffer, offset, length, address,
 			beforeCallback, afterCallback) {
