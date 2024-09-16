@@ -540,7 +540,7 @@ NAN_METHOD(SocketWrap::GetOption) {
 			(val ? val : (SOCKET_OPT_TYPE) &ival), &len);
 
 	if (rc == SOCKET_ERROR) {
-		Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "getsockopt", ""));
+		Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "getsockopt"));
 		return;
 	}
 	
@@ -707,7 +707,7 @@ NAN_METHOD(SocketWrap::Recv) {
 
 	rc = socket->CreateSocket ();
 	if (rc != 0) {
-		Nan::ThrowError(raw_strerror (errno));
+		Nan::ThrowError(node::ErrnoException(isolate, errno, "createsocket"));
 		return;
 	}
 
@@ -725,7 +725,7 @@ NAN_METHOD(SocketWrap::Recv) {
 				cb->Call (context, socket->handle(), 1, argv);
 				break;
 			}
-			Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "recvfrom", ""));
+			Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "recvfrom"));
 			return;
 		}
 		
@@ -900,7 +900,7 @@ NAN_METHOD(SocketWrap::Send) {
 			info.GetReturnValue().Set(Nan::New<Boolean>(false));
 			return;	
 		}
-		Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "send", ""));
+		Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "send"));
 		return;
 	}
 	
@@ -975,7 +975,7 @@ NAN_METHOD(SocketWrap::SetOption) {
 			(val ? val : (SOCKET_OPT_TYPE) &ival), len);
 
 	if (rc == SOCKET_ERROR) {
-		Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "setsockopt", ""));
+		Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "setsockopt"));
 		return;
 	}
 	
