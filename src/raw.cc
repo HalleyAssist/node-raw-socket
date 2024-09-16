@@ -540,7 +540,7 @@ NAN_METHOD(SocketWrap::GetOption) {
 			(val ? val : (SOCKET_OPT_TYPE) &ival), &len);
 
 	if (rc == SOCKET_ERROR) {
-		Nan::ThrowError(raw_strerror (SOCKET_ERRNO));
+		Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "getsockopt", ""));
 		return;
 	}
 	
@@ -567,9 +567,7 @@ void SocketWrap::HandleIOEvent (int status, int revents) {
 		 ** be a structure.  This causes issues when working with both Node.js
 		 ** 0.10 and 0.12.  So, for now, we will just give you the number.
 		 **/
-		char status_str[32];
-		sprintf(status_str, "%d", status);
-		args[1] = Nan::Error(status_str);
+		args[1] = node::ErrnoException(isolate, abs(status), "epoll", "");
 
 		cb->Call (context, handle(), 2, args);
 	} else {
@@ -727,7 +725,7 @@ NAN_METHOD(SocketWrap::Recv) {
 				cb->Call (context, socket->handle(), 1, argv);
 				break;
 			}
-			Nan::ThrowError(raw_strerror (SOCKET_ERRNO));
+			Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "recvfrom", ""));
 			return;
 		}
 		
@@ -902,7 +900,7 @@ NAN_METHOD(SocketWrap::Send) {
 			info.GetReturnValue().Set(Nan::New<Boolean>(false));
 			return;	
 		}
-		Nan::ThrowError(raw_strerror (SOCKET_ERRNO));
+		Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "send", ""));
 		return;
 	}
 	
@@ -977,7 +975,7 @@ NAN_METHOD(SocketWrap::SetOption) {
 			(val ? val : (SOCKET_OPT_TYPE) &ival), len);
 
 	if (rc == SOCKET_ERROR) {
-		Nan::ThrowError(raw_strerror(SOCKET_ERRNO));
+		Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "setsockopt", ""));
 		return;
 	}
 	
