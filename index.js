@@ -43,6 +43,18 @@ class Socket extends EventEmitter {
 		this.maxRecvPackets = 1
 	}
 
+	emitSocketMessage(newBuffer, source, buffer) {
+		this.emit ("message", newBuffer, source, buffer);
+	}
+
+	emitSocketReturn(buffer) {
+		this.emit ("return", buffer);
+	}
+
+	emitSocketError(error, buffer = undefined) {
+		this.emit ("error", error, buffer);
+	}
+
 	bufferAlloc(options){
 		this._buffer = Buffer.alloc ((options && options.bufferSize !== undefined)
 				? options.bufferSize
@@ -68,7 +80,7 @@ class Socket extends EventEmitter {
 	}
 	
 	onError (error) {
-		this.emit ("error", error);
+		this.emitSocketError(error);
 		this.close ();
 	}
 	
@@ -78,11 +90,11 @@ class Socket extends EventEmitter {
 			let remaining = this.maxRecvPackets
 			this.wrap.recv (buffer, (bytes, source)=>{
 				if(bytes < 0) {
-					this.emit ("return", buffer);
+					this.emitSocketReturn (buffer);
 					return
 				}
 				const newBuffer = buffer.slice (0, bytes);
-				this.emit ("message", newBuffer, source, buffer);
+				this.emitSocketMessage (newBuffer, source, buffer);
 				if(this.recvPaused || --remaining == 0) {
 					return
 				}
@@ -90,7 +102,7 @@ class Socket extends EventEmitter {
 				return buffer
 			})
 		} catch (error) {
-			this.emit ("error", error, buffer);
+			this.emitSocketError(error, buffer);
 		}
 	}
 	
