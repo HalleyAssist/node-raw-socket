@@ -3,10 +3,6 @@ const {EventEmitter} = require ("events"),
 	net = require ("net"),
 	raw = require ("./build/Release/raw.node");
 
-for (const key in EventEmitter.prototype) {
-  raw.SocketWrap.prototype[key] = EventEmitter.prototype[key];
-}
-
 class Socket extends EventEmitter {
 	constructor(options) {
 		super()
@@ -33,10 +29,10 @@ class Socket extends EventEmitter {
 		}
 
 		let me = this;
-		this.wrap.on ("sendReady", this.onSendReady.bind (me));
-		this.wrap.on ("recvReady", this.onRecvReady.bind (me));
-		this.wrap.on ("error", this.onError.bind (me));
-		this.wrap.on ("close", this.onClose.bind (me));
+		this.wrap._sendReady = this.onSendReady.bind (me);
+		this.wrap._recvReady = this.onRecvReady.bind (me);
+		this.wrap._error = this.onError.bind (me);
+		this.wrap._close = this.onClose.bind (me);
 
 		this._gcFix = setInterval(()=>this.wrap, 2147483647).unref();
 

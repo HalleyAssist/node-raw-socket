@@ -435,13 +435,10 @@ void SocketWrap::CloseSocket (void) {
 	}
 
 	if (! this->deconstructing_) {
-		MaybeLocal<Value> emit = handle()->Get(context, Nan::New<String>("emit").ToLocalChecked());
+		MaybeLocal<Value> emit = handle()->Get(context, Nan::New<String>("_close").ToLocalChecked());
 		Local<Function> cb = emit.ToLocalChecked().As<Function> ();
 
-		Local<Value> args[1];
-		args[0] = Nan::New<String>("close").ToLocalChecked();
-
-		cb->Call (context, handle(), 1, args);
+		cb->Call (context, handle(), 0, nullptr);
 	}
 }
 
@@ -555,11 +552,10 @@ void SocketWrap::HandleIOEvent (int status, int revents) {
   	v8::Local<v8::Context> context = isolate->GetCurrentContext();
 
 	if (status) {
-		MaybeLocal<Value> emit = handle()->Get (context, Nan::New<String>("emit").ToLocalChecked());
+		MaybeLocal<Value> emit = handle()->Get (context, Nan::New<String>("_error").ToLocalChecked());
 		Local<Function> cb = emit.ToLocalChecked().As<Function> ();
 
-		Local<Value> args[2];
-		args[0] = Nan::New<String>("error").ToLocalChecked();
+		Local<Value> args[1];
 		
 		/**
 		 ** The uv_last_error() function doesn't seem to be available in recent
@@ -567,20 +563,21 @@ void SocketWrap::HandleIOEvent (int status, int revents) {
 		 ** be a structure.  This causes issues when working with both Node.js
 		 ** 0.10 and 0.12.  So, for now, we will just give you the number.
 		 **/
-		args[1] = node::ErrnoException(isolate, abs(status), "epoll", "");
-
-		cb->Call (context, handle(), 2, args);
-	} else {
-		MaybeLocal<Value> emit = handle()->Get (context, Nan::New<String>("emit").ToLocalChecked());
-		Local<Function> cb = emit.ToLocalChecked().As<Function> ();
-
-		Local<Value> args[1];
-		if (revents & UV_READABLE)
-			args[0] = Nan::New<String>("recvReady").ToLocalChecked();
-		else
-			args[0] = Nan::New<String>("sendReady").ToLocalChecked();
+		args[0] = node::ErrnoException(isolate, abs(status), "epoll", "");
 
 		cb->Call (context, handle(), 1, args);
+	} else {
+		MaybeLocal<Value> emit;
+
+		if (revents & UV_READABLE)
+			emit = handle()->Get (context, Nan::New<String>("_recvReady").ToLocalChecked());
+		else
+			emit = handle()->Get (context, Nan::New<String>("_sendReady").ToLocalChecked());
+
+
+		Local<Function> cb = emit.ToLocalChecked().As<Function> ();
+
+		cb->Call (context, handle(), 0, nullptr);
 	}
 }
 
