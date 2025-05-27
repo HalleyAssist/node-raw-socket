@@ -190,7 +190,7 @@ NAN_METHOD(CreateChecksum) {
 		return;
 	}
 	
-	Local<Object> buffer = info[1]->ToObject (context).ToLocalChecked();
+	Local<Object> buffer = Nan::To<Object>(info[1]).ToLocalChecked();
 	char *data = node::Buffer::Data (buffer);
 	size_t length = node::Buffer::Length (buffer);
 	unsigned int offset = 0;
@@ -355,7 +355,6 @@ void ExportConstants (Local<Object> target) {
 	Nan::Set(socket_option, Nan::New("IPV6_TTL").ToLocalChecked(), Nan::New<Number>(IPV6_UNICAST_HOPS));
 	Nan::Set(socket_option, Nan::New("IPV6_UNICAST_HOPS").ToLocalChecked(), Nan::New<Number>(IPV6_UNICAST_HOPS));
 	Nan::Set(socket_option, Nan::New("IPV6_V6ONLY").ToLocalChecked(), Nan::New<Number>(IPV6_V6ONLY));
-	
 	Nan::Set(socket_level, Nan::New("TCP_KEEPCNT").ToLocalChecked(), Nan::New<Number>(TCP_KEEPCNT));
 
 
@@ -370,15 +369,12 @@ void ExportConstants (Local<Object> target) {
 }
 
 void ExportFunctions (Local<Object> target) {
-	v8::Isolate* isolate = v8::Isolate::GetCurrent();
-  	v8::Local<v8::Context> context = isolate->GetCurrentContext();
-
-	Nan::Set(target, Nan::New("createChecksum").ToLocalChecked(), Nan::New<FunctionTemplate>(CreateChecksum)->GetFunction (context).ToLocalChecked());
+	Nan::Set(target, Nan::New("createChecksum").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(CreateChecksum)).ToLocalChecked());
 	
-	Nan::Set(target, Nan::New("htonl").ToLocalChecked(), Nan::New<FunctionTemplate>(Htonl)->GetFunction (context).ToLocalChecked());
-	Nan::Set(target, Nan::New("htons").ToLocalChecked(), Nan::New<FunctionTemplate>(Htons)->GetFunction (context).ToLocalChecked());
-	Nan::Set(target, Nan::New("ntohl").ToLocalChecked(), Nan::New<FunctionTemplate>(Ntohl)->GetFunction (context).ToLocalChecked());
-	Nan::Set(target, Nan::New("ntohs").ToLocalChecked(), Nan::New<FunctionTemplate>(Ntohs)->GetFunction (context).ToLocalChecked());
+	Nan::Set(target, Nan::New("htonl").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(Htonl)).ToLocalChecked());
+	Nan::Set(target, Nan::New("htons").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(Htons)).ToLocalChecked());
+	Nan::Set(target, Nan::New("ntohl").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(Ntohl)).ToLocalChecked());
+	Nan::Set(target, Nan::New("ntohs").ToLocalChecked(), Nan::GetFunction(Nan::New<FunctionTemplate>(Ntohs)).ToLocalChecked());
 }
 
 void SocketWrap::Init (Local<Object> exports) {
@@ -399,8 +395,7 @@ void SocketWrap::Init (Local<Object> exports) {
 	Nan::SetPrototypeMethod(tpl, "bindBluetooth", BindBluetooth);
 
 	SocketWrap_constructor.Reset(tpl);
-	exports->Set(context, Nan::New("SocketWrap").ToLocalChecked(),
-			Nan::GetFunction(tpl).ToLocalChecked());
+	Nan::Set(exports, Nan::New("SocketWrap").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
 }
 
 SocketWrap::SocketWrap () {
@@ -418,6 +413,11 @@ NAN_METHOD(SocketWrap::Close) {
 	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
 	
 	socket->CloseSocket ();
+
+	Local<Value> args[1];
+	args[0] = Nan::New<String>("close").ToLocalChecked();
+
+	Nan::Call(Nan::New<String>("emit").ToLocalChecked(), info.This(), 1, args);
 
 	info.GetReturnValue().Set(info.This());
 }
@@ -523,7 +523,7 @@ NAN_METHOD(SocketWrap::GetOption) {
 		return;
 	}
 	
-	Local<Object> buffer = info[2]->ToObject (context).ToLocalChecked();
+	Local<Object> buffer = Nan::To<Object>(info[2]).ToLocalChecked();
 	val = node::Buffer::Data (buffer);
 
 	if (! info[3]->IsInt32 ()) {
@@ -640,13 +640,13 @@ NAN_METHOD(SocketWrap::Pause) {
 		Nan::ThrowTypeError("Recv argument must be a boolean");
 		return;
 	}
-	bool pause_recv = info[0]->ToBoolean (isolate)->Value ();
+	bool pause_recv = Nan::To<Boolean>(info[0]).ToLocalChecked()->Value();
 
 	if (! info[1]->IsBoolean ()) {
 		Nan::ThrowTypeError("Send argument must be a boolean");
 		return;
 	}
-	bool pause_send = info[1]->ToBoolean (isolate)->Value ();
+	bool pause_send = Nan::To<Boolean>(info[1]).ToLocalChecked()->Value();
 	
 	int events = (pause_recv ? 0 : UV_READABLE)
 			| (pause_send ? 0 : UV_WRITABLE);
@@ -694,7 +694,7 @@ NAN_METHOD(SocketWrap::Recv) {
 		Nan::ThrowTypeError("Buffer argument must be a node Buffer object");
 		return;
 	} else {
-		buffer = info[0]->ToObject (context).ToLocalChecked();
+		buffer = Nan::To<Object>(info[0]).ToLocalChecked();
 	}
 
 	if (! info[1]->IsFunction ()) {
@@ -719,7 +719,7 @@ NAN_METHOD(SocketWrap::Recv) {
 		if (rc == SOCKET_ERROR) {
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
 				argv[0] = Nan::New<Number>(-1);
-				cb->Call (context, socket->handle(), 1, argv);
+				Nan::Call(Nan::Callback(cb), argc, argv);
 				break;
 			}
 			Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "recvfrom"));
@@ -820,7 +820,7 @@ NAN_METHOD(SocketWrap::Send) {
 		return;
 	}
 	
-	buffer = info[0]->ToObject (context).ToLocalChecked();
+	buffer = Nan::To<Object>(info[0]).ToLocalChecked();
 	offset = Nan::To<Uint32>(info[1]).ToLocalChecked()->Value();
 	length = Nan::To<Uint32>(info[2]).ToLocalChecked()->Value();
 	try_send = info[5]->ToBoolean (isolate)->Value ();
@@ -905,7 +905,7 @@ NAN_METHOD(SocketWrap::Send) {
 	const unsigned argc = 1;
 	Local<Value> argv[argc];
 	argv[0] = Nan::New<Number>(rc);
-	cb->Call (context, socket->handle(), argc, argv);
+	Nan::Call(Nan::Callback(cb), argc, argv);
 	
 	info.GetReturnValue().Set(info.This());
 }
@@ -944,7 +944,7 @@ NAN_METHOD(SocketWrap::SetOption) {
 			return;
 		}
 		
-		Local<Object> buffer = info[2]->ToObject (context).ToLocalChecked ();
+		Local<Object> buffer = Nan::To<Object>(info[2]).ToLocalChecked();
 		val = node::Buffer::Data (buffer);
 
 		if (! info[3]->IsInt32 ()) {
