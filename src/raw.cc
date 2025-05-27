@@ -719,7 +719,7 @@ NAN_METHOD(SocketWrap::Recv) {
 		if (rc == SOCKET_ERROR) {
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
 				argv[0] = Nan::New<Number>(-1);
-				Nan::Call(Nan::Callback(cb), argc, argv);
+				Nan::Call(Nan::Callback(cb), 1, argv);
 				break;
 			}
 			Nan::ThrowError(node::ErrnoException(isolate, SOCKET_ERRNO, "recvfrom"));
