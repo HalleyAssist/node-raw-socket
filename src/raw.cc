@@ -362,10 +362,12 @@ void ExportConstants (Local<Object> target) {
 	Nan::Set(address_family, Nan::New("AF_INET6").ToLocalChecked(), Nan::New<Number>(AF_INET6));
 	Nan::Set(address_family, Nan::New("PF_PACKET").ToLocalChecked(), Nan::New<Number>(PF_PACKET));
 	Nan::Set(address_family, Nan::New("AF_BLUETOOTH").ToLocalChecked(), Nan::New<Number>(AF_BLUETOOTH));
+	Nan::Set(address_family, Nan::New("AF_NETLINK").ToLocalChecked(), Nan::New<Number>(AF_NETLINK));
 
 	
 	Nan::Set(socket_protocol, Nan::New("BTPROTO_HCI").ToLocalChecked(), Nan::New<Number>(BTPROTO_HCI));
 	Nan::Set(socket_protocol, Nan::New("BTPROTO_L2CAP").ToLocalChecked(), Nan::New<Number>(BTPROTO_L2CAP));
+	Nan::Set(socket_protocol, Nan::New("BTPROTO_HCI").ToLocalChecked(), Nan::New<Number>(BTPROTO_HCI));
 }
 
 void ExportFunctions (Local<Object> target) {
@@ -393,6 +395,7 @@ void SocketWrap::Init (Local<Object> exports) {
 	Nan::SetPrototypeMethod(tpl, "send", Send);
 	Nan::SetPrototypeMethod(tpl, "setOption", SetOption);
 	Nan::SetPrototypeMethod(tpl, "bindBluetooth", BindBluetooth);
+	Nan::SetPrototypeMethod(tpl, "bindNetlink", BindNetlink);
 
 	SocketWrap_constructor.Reset(tpl);
 	Nan::Set(exports, Nan::New("SocketWrap").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
@@ -681,6 +684,8 @@ NAN_METHOD(SocketWrap::Recv) {
 		sin_length = sizeof (sockaddr_in6);
 	} else if (socket->family_ == AF_INET) {
 		sin_length = sizeof (sockaddr_in);
+	} else if (socket->family_ == AF_NETLINK) {
+		sin_length = sizeof (sockaddr_nl);
 	} else {
 		sin_length = sizeof(sockaddr_ll);
 	}
@@ -1052,6 +1057,28 @@ NAN_METHOD(SocketWrap::BindBluetooth)
 	}
 
 	info.GetReturnValue().Set(devId);
+}
+
+NAN_METHOD(SocketWrap::BindNetlink)
+{
+	Nan::HandleScope scope;
+
+	struct sockaddr_nl a = {};
+	SocketWrap* socket = SocketWrap::Unwrap<SocketWrap> (info.This ());
+
+	unsigned int port = Nan::To<unsigned int>(info[0]).FromJust();
+	unsigned int groups = Nan::To<unsigned int>(info[1]).FromJust();
+
+	a.nl_family = AF_NETLINK;
+    a.nl_pid = port;
+    a.nl_groups = groups;
+
+	if (bind(socket->poll_fd_, (struct sockaddr *)&a, sizeof(a)) < 0)
+	{
+		Nan::ThrowError(Nan::ErrnoException(errno, "bind"));
+	}
+
+	info.GetReturnValue().Set(true);
 }
 
 static void IoEvent (uv_poll_t* watcher, int status, int revents) {

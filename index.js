@@ -24,8 +24,14 @@ class Socket extends EventEmitter {
 			);
 		this.options = options
 
-		if(addressFamily == exports.AddressFamily.AF_BLUETOOTH) {
-			this.wrap.bindBluetooth(options.hciDevice)
+
+		switch(addressFamily) {
+			case exports.AddressFamily.AF_BLUETOOTH:	
+				this.wrap.bindBluetooth(options.hciDevice)
+				break
+			case exports.AddressFamily.AF_NETLINK:
+				this.wrap.bindNetlink(options.netlinkPort || 0, options.netlinkGroup || 0);
+				break
 		}
 
 		let me = this;
