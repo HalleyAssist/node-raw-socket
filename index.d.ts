@@ -78,7 +78,7 @@ declare namespace raw {
 	class Socket extends EventEmitter {
 		constructor(options?: SocketOptions);
 
-		readonly buffer: Buffer;
+		get buffer(): Buffer
 		options: SocketOptions;
 		recvPaused: boolean;
 		sendPaused: boolean;
