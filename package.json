@@ -3,6 +3,7 @@
   "version": "1.8.1",
   "description": "Raw sockets for Node.js.",
   "main": "index.js",
+  "types": "index.d.ts",
   "directories": {
     "example": "example"
   },
